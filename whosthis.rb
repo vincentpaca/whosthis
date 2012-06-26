@@ -16,7 +16,6 @@ class WhosThis
     puts "Starting"
     parse("http://www.google.com/search?num=#{@pages}&q=#{@tags.gsub(' ', '+')}")
     puts "Done"
-    print "Press any key to exit"
   end
 
   def parse(url)
@@ -29,7 +28,7 @@ class WhosThis
           host = URI.parse(link['href'].clean).host
           who = whois.query(host.gsub('www.', '')).to_s
           emails = who.scan(r).uniq
-          emails.each { |email| f.puts email }
+          emails.each { |email| f.puts "#{email} - #{host}" unless email.include?("domaindiscreet") || email.include?("domainsbyproxy") }
         rescue
           nil
         end
