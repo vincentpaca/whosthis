@@ -2,10 +2,11 @@ require 'nokogiri'
 require 'open-uri'
 require 'uri'
 require 'whois'
+require 'anemone'
 
 class WhosThis
 
-  def initialize()
+  def initialize
     puts "Input the tags to search for separated in spaces : "
     @tags = gets.chomp
     puts "How many results would you like? Give a number : "
@@ -28,7 +29,17 @@ class WhosThis
           host = URI.parse(link['href'].clean).host
           who = whois.query(host.gsub('www.', '')).to_s
           emails = who.scan(r).uniq
-          emails.each { |email| f.puts "#{email} - #{host}" unless email.include?("domaindiscreet") || email.include?("domainsbyproxy") }
+          emails.each { |email| f.puts "WhoIs: #{email} - #{host}" unless email.include?("domaindiscreet") || email.include?("domainsbyproxy") }
+          begin
+            Anemone.crawl("http://#{host}") do |website|
+              website.on_pages_like(/(about|info|contact)/) do |page|
+                emails = "#{page.doc.at('body')}".scan(r).uniq
+                emails.each { |email| f.puts "Contact page: #{email} - #{host}" }
+              end
+            end
+          rescue Timeout::Error
+            nil
+          end
         rescue
           nil
         end
