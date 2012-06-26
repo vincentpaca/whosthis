@@ -14,8 +14,7 @@ class WhosThis
   
   def start
     puts "Starting"
-    thread = Thread.new { parse("http://www.google.com/search?num=#{@pages}&q=#{@tags.gsub(' ', '+')}") }
-    thread.join
+    parse("http://www.google.com/search?num=#{@pages}&q=#{@tags.gsub(' ', '+')}")
     puts "Done"
     print "Press any key to exit"
   end
