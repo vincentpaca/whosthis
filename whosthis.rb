@@ -1,7 +1,6 @@
 require 'nokogiri'
 require 'open-uri'
 require 'uri'
-require 'thread'
 require 'whois'
 
 class WhosThis
@@ -15,10 +14,10 @@ class WhosThis
   
   def start
     puts "Starting"
-    parse("http://www.google.com/search?num=#{@pages}&q=#{@tags.gsub(' ', '+')}")
+    thread = Thread.new { parse("http://www.google.com/search?num=#{@pages}&q=#{@tags.gsub(' ', '+')}") }
+    thread.join
     puts "Done"
     print "Press any key to exit"
-    exit if gets.chomp
   end
 
   def parse(url)
@@ -48,4 +47,11 @@ class String
 end
 
 a = WhosThis.new
-a.start
+begin
+ a.start
+rescue Exception =>e
+  File.open("err.txt", 'w') do |f|
+    f.puts e.inspect
+    f.puts e.backtrace
+  end
+end
