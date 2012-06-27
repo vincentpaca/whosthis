@@ -28,13 +28,22 @@ class WhosThis
         begin
           host = URI.parse(link['href'].clean).host
           who = whois.query(host.gsub('www.', '')).to_s
+          puts "Checking WhoIs for #{host}"
           emails = who.scan(r).uniq
           emails.each { |email| f.puts "WhoIs: #{email} - #{host}" unless email.include?("domaindiscreet") || email.include?("domainsbyproxy") }
           begin
             Anemone.crawl("http://#{host}") do |website|
+              checked_urls = []
               website.on_pages_like(/(about|info|contact)/) do |page|
-                emails = "#{page.doc.at('body')}".scan(r).uniq
-                emails.each { |email| f.puts "Contact page: #{email} - #{host}" }
+                unless checked_urls.include?(page.url)
+                  puts "Checking #{page.url}..."
+                  checked_urls << page.url
+                  emails = "#{page.doc.at('body')}".scan(r).uniq
+                  emails.each { |email| f.puts "Contact page: #{email} - #{host}" } unless emails.nil?
+                  break if checked_urls.count > 5
+                else
+                  puts "Skipping #{page.url}..."
+                end
               end
             end
           rescue Timeout::Error
