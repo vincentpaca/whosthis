@@ -35,7 +35,11 @@ class WhosThis
       proxy = find_working_proxy
       begin
         puts "Searching Google for '#{@tags}'"
-        result = Nokogiri::HTML(open(url, :proxy => "http://#{proxy[:host]}:#{proxy[:port]}"))
+        begin
+          result = Nokogiri::HTML(open(url, :proxy => "http://#{proxy[:host]}:#{proxy[:port]}"))
+        rescue Timeout::Error
+          retry
+        end
       rescue
         puts "The server timed out, retrying..."
         retry
