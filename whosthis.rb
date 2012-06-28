@@ -15,6 +15,8 @@ class WhosThis
     @tags = gets.chomp
     puts "How many results would you like? Give a number : "
     @pages = gets.chomp
+    puts "Use a proxy? (Y/N) : "
+    @use_proxy = gets.chomp
 
     #init whois
     @whois = Whois::Client.new
@@ -27,9 +29,22 @@ class WhosThis
   end
 
   def parse(url)
-    result = Nokogiri::HTML(open(url))
+    result = ""
+    if @use_proxy.downcase.include?("y")
+      puts "Selecting a working proxy server, this will take a while :)"
+      proxy = find_working_proxy
+      begin
+        puts "Searching Google for '#{@tags}'"
+        result = Nokogiri::HTML(open(url, :proxy => "http://#{proxy[:host]}:#{proxy[:port]}"))
+      rescue
+        puts "The server timed out, retrying..."
+        retry
+      end
+    else
+      puts "Searching Google for '#{@tags}'"
+      result = Nokogiri::HTML(open(url))
+    end
     sites = []
-    
     File.open("output.txt", 'w') do |f|
       result.css('h3 a').each do |link|
         begin
@@ -46,11 +61,11 @@ class WhosThis
           #if can't find anything from WhoIs, dig into their contact/about pages
           if emails.empty?
             begin
-              Anemone.crawl("http://#{host}") do |website|
+              Anemone.crawl("http://#{host}", :proxy_host => proxy[:host], :proxy_port => proxy[:port]) do |website|
                 checked_urls = []
                 website.on_pages_like(/(about|info|contact)/) do |page|
                   #skip this url if we've been here before
-                  break if checked_urls.include(page.url)
+                  break if checked_urls.include?(page.url)
                   puts "Checking #{page.url}..."
                   checked_urls << page.url
                   emails = "#{page.doc.at('body')}".scan(@@regex).uniq
@@ -60,12 +75,38 @@ class WhosThis
                 end
               end
             rescue Timeout::Error
-              nil
+              puts "The server timed out, retrying..."
+              retry
             end
           end
         rescue
           nil
         end
+      end
+    end
+  end
+
+  def find_working_proxy
+    get_proxies.each do |proxy|
+      print "Testing #{proxy[:host]}:#{proxy[:port]}..."
+      begin
+        result = Nokogiri::HTML(open("http://google.com/search?num=1&q=test", :proxy => "http://#{proxy[:host]}:#{proxy[:port]}"))
+        puts "Working!"
+        return proxy
+      rescue
+        puts "Failed!"
+      end
+    end
+  end
+
+  def get_proxies
+    uri = URI.parse("http://hidemyass.com/proxy-list/search-226094")
+    dom = Nokogiri::HTML(open(uri))
+
+    @proxies ||= dom.xpath('//table[@id="listtable"]/tr').collect do |node|
+      if node.at_xpath('td[5]/div').at_xpath('div').to_s.include?("fast") || node.at_xpath('td[6]/div').at_xpath('div').to_s.include?("fast") || node.at_xpath('td[8]').to_s.include?("High")
+        { port: node.at_xpath('td[3]').content.strip,
+          host: node.at_xpath('td[2]/span').xpath('text() | *[not(contains(@style, "display:none"))]').map(&:content).compact.join.to_s }
       end
     end
   end
@@ -80,7 +121,7 @@ end
 
 a = WhosThis.new
 begin
- a.start
+  a.start
 rescue Exception =>e
   File.open("err.txt", 'w') do |f|
     f.puts e.inspect
